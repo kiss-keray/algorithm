@@ -19,7 +19,7 @@ public class 插入排序 {
         int[] ints = new int[100];
         for (int i = 0; i < 100; i++)
             ints[i] = (int) (Math.random() * 200);
-        ints = sort(ints);
+        sort(ints);
         for (int _int : ints)
             System.out.println(_int);
     }
