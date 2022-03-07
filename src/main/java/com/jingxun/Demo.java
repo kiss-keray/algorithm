@@ -1,15 +1,12 @@
 package com.jingxun;
 
-import org.apache.poi.xssf.usermodel.XSSFWorkbook;
-
-import java.io.File;
+import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.stream.Collectors;
+import java.util.Stack;
+import java.util.concurrent.LinkedBlockingDeque;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 
 public class Demo {
@@ -50,25 +47,18 @@ public class Demo {
         demo.inputLine("交通大学-机械动力工程学院-工业工程系");
         demo.inputLine("上海交通大学1-动力工程学院-工业工程与管理系");
         demo.inputLine("交大-机械与动力工程学院-工业工程系");
-    }
-
-    public class TreeNodeData {
-        /**
-         * 数据
-         */
-        String data;
-        /**
-         * 挂载点
-         */
-        TreeNode point;
+        demo.inputLine("交大-计算机-软件处");
+        demo.inputLine("交大-计算机1-软件处");
+        demo.inputLine("交大-计算机1-软件处1");
+        demo.printTree();
     }
 
 
-    public class TreeNode {
+    public static class TreeNode {
         /**
          * 当前节点数据
          */
-        LinkedList<TreeNodeData> data = new LinkedList<>();
+        LinkedList<String> data = new LinkedList<>();
 
         /**
          * 上级
@@ -87,70 +77,46 @@ public class Demo {
     public void inputLine(String lineData) {
         String[] data = lineData.split("-");
         TreeNode parent = root;
-        for (int i = 0; i < data.length; i++) {
-            var name = data[i];
-            parent = processWord(i + 1, name, parent);
+        for (String name : data) {
+            parent = processWord(name, parent);
         }
     }
 
 
-    private TreeNode processWord(int level, String str, TreeNode parent) {
+    private TreeNode processWord(String str, TreeNode parent) {
         if (str.isEmpty()) return null;
-        // 找到同层级下的所有节点
-        List<TreeNode> levelData = getLevelData(level, root);
-        // 实例化当前数据对象
-        TreeNodeData treeNodeData = new TreeNodeData();
-        treeNodeData.data = str;
-        // 遍历当前层节点
-        levelData.forEach(node -> {
-            // 判断节点的父节点不等于当前数据的父节点
-            if (node.parent != parent) {
-                // 如果节点存在数据点与当前数据点的相似度大于60 则将当前数据点添加到当前节点
-                if (node.data.stream().anyMatch(nodeData -> wordSimilarity(nodeData.data, str) > 60)) {
-                    // 回归分析上层
-                    regressionAnalysis(parent, node.parent);
-                    node.data.add(treeNodeData);
-                }
-            }
-        });
         // 选择最优的同层节点
         var maxSimilarity = 0;
+        TreeNode addNode = null;
         // 遍历兄弟节点找合适的落脚点
         for (var pNode : parent.children) {
+            var havaAdd = false;
+            var equals = false;
             for (var pNodeData : pNode.data) {
-                var similarity = wordSimilarity(pNodeData.data, str);
+                var similarity = wordSimilarity(pNodeData, str);
+                equals = equals || pNodeData.equals(str);
                 if (similarity > 60) {
                     if (maxSimilarity < similarity) {
                         maxSimilarity = similarity;
-                        treeNodeData.point = pNode;
+                        addNode = pNode;
                     }
-                    pNode.data.add(treeNodeData);
+                    havaAdd = true;
                 }
+            }
+            if (havaAdd && !equals) {
+                pNode.data.add(str);
             }
         }
         // 如果当前兄弟节点没找到合适的落脚点
-        if (treeNodeData.point == null) {
+        if (addNode == null) {
             // 直接在父节点给自己造一个落脚点
             var node = new TreeNode();
-            node.data.add(treeNodeData);
-            treeNodeData.point = node;
+            node.data.add(str);
+            node.parent = parent;
+            addNode = node;
             parent.children.add(node);
         }
-        return treeNodeData.point;
-    }
-
-    /**
-     * 回归分析当前节点之上的同层节点的之间的关系
-     * @param node
-     * @param node1
-     */
-    private void regressionAnalysis(TreeNode node, TreeNode node1) {
-
-    }
-
-    private List<TreeNode> getLevelData(int level, TreeNode node) {
-        if (level == 1) return node.children;
-        return node.children.stream().flatMap(child -> getLevelData(level - 1, child).stream()).collect(Collectors.toList());
+        return addNode;
     }
 
     /**
@@ -162,6 +128,41 @@ public class Demo {
      */
     private int wordSimilarity(String wordA, String wordB) {
         if (wordA.equals(wordB)) return 100;
+        List<String> list = Arrays.asList("上海交通太学", "交通大学", "上海交通大学1", "交大");
+        if (list.contains(wordA) && list.contains(wordB)) {
+            return 80;
+        }
+        list = Arrays.asList("动力工程学院", "机械动力工程学院", "动力工程学院", "机械与动力工程学院");
+        if (list.contains(wordA) && list.contains(wordB)) {
+            return 80;
+        }
+        list = Arrays.asList("工业工程管理系", "工业工程与管理系", "工业工程系");
+        if (list.contains(wordA) && list.contains(wordB)) {
+            return 80;
+        }
+        list = Arrays.asList("软件处1", "软件处");
+        if (list.contains(wordA) && list.contains(wordB)) {
+            return 80;
+        }
         return 10;
+    }
+
+    private void printTree() {
+        Stack<TreeNode> stack = new Stack<>();
+        stack.push(root);
+        while (!stack.isEmpty()) {
+            var now = stack.pop();
+            if (now.children.isEmpty()) {
+                StringBuilder sb = new StringBuilder();
+                for (var node = now; node != root; node = node.parent) {
+                    sb.insert(0, String.format("->[%s]", String.join(",", node.data)));
+                }
+                System.out.println(sb.substring(2));
+                continue;
+            }
+            for (var child : now.children) {
+                stack.push(child);
+            }
+        }
     }
 }
