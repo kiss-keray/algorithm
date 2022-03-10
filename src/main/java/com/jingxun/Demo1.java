@@ -57,7 +57,7 @@ public class Demo1 {
             return val;
         }).sum();
 
-        if (max.get() >= 80 && allScore / block.size() > 50.0) {
+        if (max.get() >= 90 && allScore / block.size() > 70.0) {
             block.add(word);
             return true;
         }
