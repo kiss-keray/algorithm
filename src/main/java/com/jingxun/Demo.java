@@ -7,6 +7,7 @@ import java.util.Stack;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 
 public class Demo {
@@ -53,12 +54,23 @@ public class Demo {
         demo.printTree();
     }
 
+    public class TreeNodeData {
+        /**
+         * 数据
+         */
+        String data;
+        /**
+         * 挂载点
+         */
+        TreeNode point;
+    }
 
-    public static class TreeNode {
+
+    public class TreeNode {
         /**
          * 当前节点数据
          */
-        LinkedList<String> data = new LinkedList<>();
+        LinkedList<TreeNodeData> data = new LinkedList<>();
 
         /**
          * 上级
@@ -77,15 +89,32 @@ public class Demo {
     public void inputLine(String lineData) {
         String[] data = lineData.split("-");
         TreeNode parent = root;
-        for (String name : data) {
-            parent = processWord(name, parent);
+        for (int i = 0; i < data.length; i++) {
+            var name = data[i];
+            parent = processWord(i + 1, name, parent);
         }
     }
 
 
-    private TreeNode processWord(String str, TreeNode parent) {
+    private TreeNode processWord(int level, String str, TreeNode parent) {
         if (str.isEmpty()) return null;
-        // 选择最优的同层节点
+        // 找到同层级下的所有节点
+        List<TreeNode> levelData = getLevelData(level, root);
+        // 实例化当前数据对象
+        TreeNodeData treeNodeData = new TreeNodeData();
+        treeNodeData.data = str;
+        // 遍历当前层节点
+        levelData.forEach(node -> {
+            // 判断节点的父节点不等于当前数据的父节点
+            if (node.parent != parent) {
+                // 如果节点存在数据点与当前数据点的相似度大于60 则将当前数据点添加到当前节点
+                if (node.data.stream().anyMatch(nodeData -> wordSimilarity(nodeData.data, str) > 60)) {
+                    // 回归分析上层
+                    regressionAnalysis(parent, node.parent);
+                    node.data.add(treeNodeData);
+                }
+            }
+        });
         var maxSimilarity = 0;
         TreeNode addNode = null;
         // 遍历兄弟节点找合适的落脚点
@@ -93,8 +122,8 @@ public class Demo {
             var havaAdd = false;
             var equals = false;
             for (var pNodeData : pNode.data) {
-                var similarity = wordSimilarity(pNodeData, str);
-                equals = equals || pNodeData.equals(str);
+                var similarity = wordSimilarity(pNodeData.data, str);
+                equals = equals || pNodeData.data.equals(str);
                 if (similarity > 60) {
                     if (maxSimilarity < similarity) {
                         maxSimilarity = similarity;
@@ -104,19 +133,35 @@ public class Demo {
                 }
             }
             if (havaAdd && !equals) {
-                pNode.data.add(str);
+                pNode.data.add(treeNodeData);
             }
         }
         // 如果当前兄弟节点没找到合适的落脚点
         if (addNode == null) {
             // 直接在父节点给自己造一个落脚点
             var node = new TreeNode();
-            node.data.add(str);
+            node.data.add(treeNodeData);
             node.parent = parent;
             addNode = node;
             parent.children.add(node);
         }
-        return addNode;
+        treeNodeData.point = addNode;
+        return treeNodeData.point;
+    }
+
+    /**
+     * 回归分析当前节点之上的同层节点的之间的关系
+     *
+     * @param node
+     * @param node1
+     */
+    private void regressionAnalysis(TreeNode node, TreeNode node1) {
+
+    }
+
+    private List<TreeNode> getLevelData(int level, TreeNode node) {
+        if (level == 1) return node.children;
+        return node.children.stream().flatMap(child -> getLevelData(level - 1, child).stream()).collect(Collectors.toList());
     }
 
     /**
@@ -155,7 +200,7 @@ public class Demo {
             if (now.children.isEmpty()) {
                 StringBuilder sb = new StringBuilder();
                 for (var node = now; node != root; node = node.parent) {
-                    sb.insert(0, String.format("->[%s]", String.join(",", node.data)));
+                    sb.insert(0, String.format("->[%s]", node.data.stream().map(v -> v.data).collect(Collectors.joining(","))));
                 }
                 System.out.println(sb.substring(2));
                 continue;
