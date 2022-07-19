@@ -1,7 +1,6 @@
 package com.jingxun;
 
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
-import org.xm.Similarity;
 
 import java.io.File;
 import java.io.FileWriter;
@@ -73,10 +72,7 @@ public class Demo1 {
      * @return 相似度 大于60就认为可以聚合
      */
     private int wordSimilarity(String wordA, String wordB) {
-        if (isEn(wordA) || isEn(wordB)) {
-            return (int) (Similarity.pinyinSimilarity(wordA, wordB) * 100);
-        }
-        return (int) (Similarity.conceptSimilarity(wordA, wordB) * 100);
+        return 80;
     }
 
     /**
