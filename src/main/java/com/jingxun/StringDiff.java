@@ -12,7 +12,7 @@ import java.util.*;
 /**
  * @author by keray
  * date:2021/3/20 4:14 下午
- * 参考: https://segmentfault.com/p/1210000009610313/read
+ * 参考: https://cloud.tencent.com/developer/article/2367282
  * 字符串diff算法
  */
 public class StringDiff {
