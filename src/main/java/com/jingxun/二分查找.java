@@ -9,7 +9,7 @@ public class 二分查找 {
         int start = 0;
         int end = arr.length - 1;
         while (start <= end) {
-            int middle = (start + end) / 2;
+            int middle = (start + end) >>> 2;  // 与(start + end) / 2 等效
             if (key < arr[middle]) {
                 end = middle - 1;
             } else if (key > arr[middle]) {

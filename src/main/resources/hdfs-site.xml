@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
+<!--
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License. See accompanying LICENSE file.
+-->
+
+<!-- Put site-specific property overrides in this file. -->
+
+
+<configuration>
+  <property>
+    <name>dfs.nameservices</name>
+    <value>vipns</value>
+  </property>
+  <!-- ns下面有两个NameNode，分别是vns1，vns2 -->
+  <property>
+    <name>dfs.ha.namenodes.vipns</name>
+    <value>vns1,vns2,vns3</value>
+  </property>
+  <!-- vns1的RPC通信地址 -->
+  <property>
+    <name>dfs.namenode.rpc-address.vipns.vns1</name>
+    <value>VIP-DC-MASTER-1:9000</value>
+  </property>
+  <!-- vns1的http通信地址 -->
+  <property>
+    <name>dfs.namenode.http-address.vipns.vns1</name>
+    <value>VIP-DC-MASTER-1:9870</value>
+  </property>
+  <!-- vns2的RPC通信地址 -->
+  <property>
+    <name>dfs.namenode.rpc-address.vipns.vns2</name>
+    <value>VIP-DC-MASTER-2:9000</value>
+  </property>
+  <!-- vns2的http通信地址 -->
+  <property>
+    <name>dfs.namenode.http-address.vipns.vns2</name>
+    <value>VIP-DC-MASTER-2:9870</value>
+  </property>
+  <!-- vns3的RPC通信地址 -->
+  <property>
+    <name>dfs.namenode.rpc-address.vipns.vns3</name>
+    <value>VIP-DC-MASTER-3:9000</value>
+  </property>
+  <!-- vns3的http通信地址 -->
+  <property>
+    <name>dfs.namenode.http-address.vipns.vns3</name>
+    <value>VIP-DC-MASTER-3:9870</value>
+  </property>
+  <!-- 指定NameNode的元数据在JournalNode上的存放位置 -->
+  <property>
+    <name>dfs.namenode.shared.edits.dir</name>
+    <value>qjournal://VIP-DC-MASTER-1:8485;VIP-DC-MASTER-2:8485;VIP-DC-MASTER-3:8485/vipns</value>
+  </property>
+  <!-- 指定JournalNode在本地磁盘存放数据的位置 -->
+  <property>
+    <name>dfs.journalnode.edits.dir</name>
+    <value>/devdata/apps/hadoop-3.1.3/journal</value>
+  </property>
+  <!-- 开启NameNode故障时自动切换 -->
+  <property>
+    <name>dfs.ha.automatic-failover.enabled</name>
+    <value>true</value>
+  </property>
+  <!-- 配置失败自动切换实现方式 -->
+  <property>
+    <name>dfs.client.failover.proxy.provider.vipns</name>
+    <value>org.apache.hadoop.hdfs.server.namenode.ha.ConfiguredFailoverProxyProvider</value>
+  </property>
+  <!-- 配置隔离机制，如果ssh是默认22端口，value直接写sshfence即可 -->
+  <property>
+    <name>dfs.ha.fencing.methods</name>
+    <value>sshfence</value>
+  </property>
+  <!-- 使用隔离机制时需要ssh免登陆 -->
+  <property>
+    <name>dfs.ha.fencing.ssh.private-key-files</name>
+    <value>~/.ssh/id_rsa</value>
+  </property>
+
+  <property>
+    <name>dfs.namenode.name.dir</name>
+    <value>file:/devdata/apps/hadoop-3.1.3/hdfs/name</value>
+  </property>
+
+  <property>
+    <name>dfs.datanode.data.dir</name>
+    <value>/devdata/disk/dir1,/devdata/disk/dir2,/devdata/disk/dir3,/devdata/disk/dir4,/devdata/disk/dir5,/devdata/disk/dir6</value>
+  </property>
+
+  <property>
+    <name>dfs.replication</name>
+    <value>3</value>
+  </property>
+
+  <property>
+    <name>dfs.hosts.exclude</name>
+    <value>/devdata/apps/hadoop-3.1.3/etc/hadoop/dfshosts.exclude</value>
+  </property>
+
+  <property>
+    <name>dfs.qjournal.write-txns.timeout.ms</name>
+    <value>60000</value>
+  </property>
+
+  <!-- 在NN和DN上开启WebHDFS (REST API)功能,不是必须 -->
+  <property>
+    <name>dfs.webhdfs.enabled</name>
+    <value>false</value>
+  </property>
+</configuration>
