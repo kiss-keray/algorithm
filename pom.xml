@@ -97,7 +97,7 @@
                             <archive>
                                 <manifest>
                                     <mainClass>
-                                        com.jingxun.SearchComputed2
+                                        com.jingxun.SearchComputed4
                                     </mainClass>
                                 </manifest>
                             </archive>
@@ -109,5 +109,6 @@
                 </executions>
             </plugin>
         </plugins>
+        <finalName>algorithm</finalName>
     </build>
 </project>

@@ -1,11 +1,8 @@
 package com.jingxun;
 
-import cn.hutool.core.util.ByteUtil;
-
-import java.io.BufferedReader;
-import java.io.FileInputStream;
-import java.io.FileReader;
-import java.util.concurrent.*;
+import java.util.concurrent.LinkedBlockingDeque;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -15,24 +12,6 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 public class Keray {
     public static void main(String[] args) throws Exception {
-        var latch = new AddDownLatch();
-        ThreadPoolExecutor pool = new ThreadPoolExecutor(200, 200, 100, TimeUnit.DAYS, new LinkedBlockingDeque<>());
-        var cnt = new AtomicInteger();
-        for (var i = 0; i < 10000; i++) {
-            latch.add();
-            pool.execute(() -> {
-                try {
-                    Thread.sleep((long) (10 + Math.random() * 100));
-                    cnt.getAndIncrement();
-                } catch (InterruptedException e) {
-                    throw new RuntimeException(e);
-                } finally {
-                    latch.countDown();
-                }
-            });
-        }
-        latch.await();
-        System.out.println(cnt.get());
-        pool.shutdownNow();
+        System.out.println("数据".hashCode() & 1023);
     }
 }

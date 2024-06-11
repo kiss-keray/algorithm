@@ -2,29 +2,18 @@ package com.jingxun;
 
 import cn.hutool.core.util.ByteUtil;
 import cn.hutool.core.util.StrUtil;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.LocatedFileStatus;
-import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.RemoteIterator;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
-import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
-
-import static cn.hutool.poi.excel.sax.ElementName.c;
-import static cn.hutool.poi.excel.sax.ElementName.v;
 
 /**
  * 生成词到ids的数据
  * 数据 -> [1,2,3]
  */
 public class SearchComputed4 {
-
-    static ThreadPoolExecutor pool = new ThreadPoolExecutor(30, 30, 100, TimeUnit.DAYS, new LinkedBlockingDeque<>());
 
     private static String rootPath;
 
@@ -36,41 +25,14 @@ public class SearchComputed4 {
         if (StrUtil.isEmpty(rootPath)) return;
         errorOut = new FileOutputStream(rootPath + "/error.txt");
         for (var i = 0; i < dirSize; i++) {
-            SearchComputed1.createdDir(new File(rootPath + "/" + i));
+            SearchComputed.createdDir(new File(rootPath + "/" + i));
         }
         cntInit();
-        Configuration configuration = new Configuration();
-        var time = System.currentTimeMillis();
-        var semaphore = new Semaphore(2);
-        var latch = new AddDownLatch();
-        try (var fs = FileSystem.get(configuration)) {
-            Path path = new Path("/dataplat/OMDPV2/data/data-process-svc/export/yzh/search/allProcData");
-            RemoteIterator<LocatedFileStatus> locatedFileStatusRemoteIterator = fs.listFiles(path, true);
-            locatedFileStatusRemoteIterator.next();
-            while (locatedFileStatusRemoteIterator.hasNext()) {
-                var ph = locatedFileStatusRemoteIterator.next().getPath();
-                semaphore.acquire();
-                latch.add();
-                pool.execute(() -> {
-                    try {
-                        SearchComputed1.oneFileProcess(fs, ph, 200, (line, schema) -> {
-                            var index = (Number) SearchComputed1.getParquetFieldValue(line, schema.getType("orderId"), schema.getFieldIndex("orderId"), 0);
-                            var data = (List<String>) SearchComputed1.getParquetFieldValue(line, schema.getType("data"), schema.getFieldIndex("data"), 0);
-                            add(new HashSet<>(data), index.intValue());
-                            SearchComputed1.oneOk();
-                        });
-                    } catch (Exception e) {
-                        throw new RuntimeException(e);
-                    } finally {
-                        latch.countDown();
-                        semaphore.release();
-                    }
-                });
-            }
-        }
-        latch.await();
-        System.out.println("耗时:" + (System.currentTimeMillis() - time));
-        SearchComputed1.pool.shutdown();
+        SearchComputed.fileProcess(5,100,(line, schema) -> {
+            var index = (Number) SearchComputed.getParquetFieldValue(line, schema.getType("orderId"), schema.getFieldIndex("orderId"), 0);
+            var data = (List<String>) SearchComputed.getParquetFieldValue(line, schema.getType("data"), schema.getFieldIndex("data"), 0);
+            add(new HashSet<>(data), index.intValue());
+        });
         errorOut.close();
     }
 
@@ -101,10 +63,10 @@ public class SearchComputed4 {
             var data = map.computeIfAbsent(word, v -> new Data(total));
             a:
             synchronized (data.lock) {
-                System.arraycopy(ByteUtil.intToBytes(id), 0, data.bytes, data.index, 4);
-                data.index += 4;
+                var _index = data.getIndex();
+                System.arraycopy(ByteUtil.intToBytes(id), 0, data.bytes, _index << 2, 4);
                 data.cnt++;
-                if (data.index < data.bytes.length && data.cnt < data.total) break a;
+                if (_index < Data.len - 1 && data.cnt < data.total) break a;
                 try {
                     syncWord(word, data);
                 } catch (Exception ignore) {
@@ -114,7 +76,6 @@ public class SearchComputed4 {
                         throw new RuntimeException(e);
                     }
                 }
-                data.index = 0;
             }
             if (data.cnt == data.total) {
                 if (data.write != null) {
@@ -163,7 +124,7 @@ public class SearchComputed4 {
             write = new FileOutputStream(rootPath + "/" + (word.hashCode() & (dirSize - 1)) + "/" + word, true);
             data.write = write;
         }
-        write.write(data.bytes, 0, data.index);
+        write.write(data.bytes, 0, data.getIndex());
         write.flush();
         if (data.total != data.cnt && data.total < 100000) {
             data.write.close();
@@ -174,11 +135,12 @@ public class SearchComputed4 {
 
 
     static class Data {
+        static final int len = Integer.parseInt(System.getProperty("len", "10240"));
+        static int len1 = len << 2;
         final Object lock = new Object();
-        int index = 0;
         int total;
         int cnt = 0;
-        byte[] bytes = new byte[4096];
+        byte[] bytes = new byte[len1];
         FileOutputStream write;
 
         public Data(int total) {
@@ -189,6 +151,10 @@ public class SearchComputed4 {
         void clean() {
             bytes = null;
             write = null;
+        }
+
+        int getIndex() {
+            return cnt & (len - 1);
         }
     }
 
