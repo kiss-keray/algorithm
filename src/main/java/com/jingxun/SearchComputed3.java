@@ -35,18 +35,30 @@ public class SearchComputed3 {
         long time = 0;
         var cnt = 0;
         while (true) {
+            var x = System.currentTimeMillis();
             var data = execNextData(queue, flag);
+            System.out.println("加载耗时:" + (System.currentTimeMillis() - x));
             if (data == null) break;
             var now = System.currentTimeMillis();
-            Thread.sleep(10);
+            computed(data);
             time += (System.currentTimeMillis() - now);
-            // 计算过程
             data.clean();
             cnt++;
             System.out.printf("完成:%s %d %n", data.word, cnt);
         }
         checkMemory(0, true);
         System.out.println("耗时:" + time);
+    }
+
+    private static void computed(Data data) {
+        if (data.arr1 == null && data.arr2 == null) return;
+        var index1 = 0;
+        var index2 = 0;
+        if (data.arr3 == null) {
+            if (data.arr1 != null) index1 = data.arr1.length;
+            if (data.arr2 != null) index2 = data.arr2.length;
+        }
+
     }
 
     private static void cntInit() throws Exception {
@@ -82,8 +94,11 @@ public class SearchComputed3 {
                     while (!Thread.currentThread().isInterrupted()) {
                         String word = wq.poll();
                         if (word == null) return;
+                        if ((word.hashCode() & 1023) != 1022) continue;
                         try {
-                            queue.put(loadOneData(word));
+                            var data = loadOneData(word);
+                            if (data == null) continue;
+                            queue.put(data);
                         } catch (OutOfMemoryError ignore) {
                             try {
                                 Thread.sleep(1);
@@ -124,17 +139,21 @@ public class SearchComputed3 {
             int[] wa = null;
             var buffLen = 65536;
             byte[] buff;
+            if ((wm & 3) != 0) {
+                throw new RuntimeException(word);
+            }
             synchronized (clock) {
                 checkMemory(fm + em + wm + buffLen, false);
-                fa = new int[fm / 4];
-                if (!fe) ea = new int[em / 4];
-                if (wi != null) wa = new int[wm / 4];
+                fa = new int[fm >>> 2];
+                if (!fe) ea = new int[em >>> 2];
+                if (wi != null) wa = new int[wm >>> 2];
                 buff = new byte[buffLen];
             }
             data.arr1 = readFileIntArray(fi, fa, buff);
             if (!fe) data.arr2 = readFileIntArray(ei, ea, buff);
             if (wi != null) data.arr3 = readFileIntArray(wi, wa, buff);
-        }catch (FileNotFoundException e) {
+            if (wi == null) return null;
+        } catch (FileNotFoundException e) {
             return data;
         }
         return data;

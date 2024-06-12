@@ -28,7 +28,7 @@ public class SearchComputed4 {
             SearchComputed.createdDir(new File(rootPath + "/" + i));
         }
         cntInit();
-        SearchComputed.fileProcess(5,100,(line, schema) -> {
+        SearchComputed.fileProcess(20, 100, (line, schema) -> {
             var index = (Number) SearchComputed.getParquetFieldValue(line, schema.getType("orderId"), schema.getFieldIndex("orderId"), 0);
             var data = (List<String>) SearchComputed.getParquetFieldValue(line, schema.getType("data"), schema.getFieldIndex("data"), 0);
             add(new HashSet<>(data), index.intValue());
@@ -124,7 +124,7 @@ public class SearchComputed4 {
             write = new FileOutputStream(rootPath + "/" + (word.hashCode() & (dirSize - 1)) + "/" + word, true);
             data.write = write;
         }
-        write.write(data.bytes, 0, data.getIndex());
+        write.write(data.bytes, 0, data.getIndex() << 2 + 4);
         write.flush();
         if (data.total != data.cnt && data.total < 100000) {
             data.write.close();

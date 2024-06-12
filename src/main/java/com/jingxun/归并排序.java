@@ -31,13 +31,13 @@ public class 归并排序 {
 
     static int[][] split(int[] a) {
         int[][] b = new int[2][];
-        b[0] = new int[a.length / 2];
-        b[1] = a.length % 2 == 0 ? new int[a.length / 2] : new int[a.length / 2 + 1];
+        b[0] = new int[a.length >>> 1];
+        b[1] = (a.length & 1) == 0 ? new int[a.length >>> 1] : new int[(a.length >>> 1) + 1];
         for (int i = 0; i < a.length; i++) {
-            if (i < a.length / 2) {
+            if (i < a.length >>> 1) {
                 b[0][i] = a[i];
             } else {
-                b[1][i - a.length / 2] = a[i];
+                b[1][i - (a.length >>> 1)] = a[i];
             }
         }
         return b;

@@ -17,7 +17,7 @@ public class Leetcode1 {
     }
 
     public int[] twoSum(int[] nums, int target) {
-        int[] copy = new int[nums.length / 2];
+        int[] copy = new int[nums.length >>> 1];
         int vl = 0;
         int vl1 = 0;
         int end = 0;
@@ -39,7 +39,7 @@ public class Leetcode1 {
         if (end == 0) return false;
         int start = 0;
         while (start <= end) {
-            int middle = (start + end) / 2;
+            int middle = (start + end) >>> 1;
             if (key < arr[middle]) {
                 end = middle - 1;
             } else if (key > arr[middle]) {
@@ -83,7 +83,7 @@ public class Leetcode1 {
                 }
                 return true;
             }
-            int middle = (start + end) / 2;
+            int middle = (start + end) >>> 1;
             boolean last = middle == start;
             if (vl < arr[middle]) {
                 if (last) {

@@ -81,7 +81,7 @@ public class 随机算法 {
         var balance = sum;
         for (var i = 0; i < size - 1; i++) {
             // 2 * 余额/剩余坑位  2 * 2 / 2 = 2 3 * 2/ 2 = 3
-            var k = 2 * balance  / (size - i);
+            var k = (balance << 1) / (size - i);
             var random = RandomUtil.randomInt(1, k);
             result[i] = random;
             balance -= random;

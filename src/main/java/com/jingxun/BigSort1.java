@@ -11,7 +11,7 @@ public class BigSort1 {
         var now = System.currentTimeMillis();
         try (var reader = new FileInputStream("/Users/keray/Downloads/xxx/用")) {
             var bs = new byte[65536];
-            var array = new int[reader.available() / 4];
+            var array = new int[reader.available() >>> 2];
             var len = 0;
             var index = 0;
             while ((len = reader.read(bs)) > 0) {
@@ -32,7 +32,7 @@ public class BigSort1 {
         var now = System.currentTimeMillis();
         try (var reader = new FileInputStream("/Users/keray/Downloads/xxx1/用")) {
             var bs = new byte[4];
-            var array = new int[reader.available() / 4];
+            var array = new int[reader.available() >>> 2];
             var len = 0;
             var index = 0;
             while ((len = reader.read(bs)) > 0) {

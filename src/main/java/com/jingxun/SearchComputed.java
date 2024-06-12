@@ -27,9 +27,9 @@ import java.util.function.BiConsumer;
 
 public class SearchComputed {
 
-    static ThreadPoolExecutor pool = new ThreadPoolExecutor(200, 200, 100, TimeUnit.DAYS, new LinkedBlockingDeque<>());
+    static ThreadPoolExecutor pool = new ThreadPoolExecutor(10, 1000, 10, TimeUnit.SECONDS, new LinkedBlockingDeque<>(1000));
 
-    static ThreadPoolExecutor pool1 = new ThreadPoolExecutor(10, 100, 100, TimeUnit.DAYS, new LinkedBlockingDeque<>(1));
+    static ThreadPoolExecutor pool1 = new ThreadPoolExecutor(10, 100, 10, TimeUnit.SECONDS, new LinkedBlockingDeque<>(1));
 
     public static void fileProcess(int parallel, int parallel1, BiConsumer<Group, MessageType> fun) throws Exception {
         Configuration configuration = new Configuration();
@@ -46,7 +46,7 @@ public class SearchComputed {
                 semaphore.acquire();
                 pool1.execute(() -> {
                     try {
-                        SearchComputed.oneFileProcess(fs, _path, parallel1, (v, v1) -> {
+                        SearchComputed.oneFileProcess(fs, _path, Math.min(parallel1, 2000 / parallel), (v, v1) -> {
                             fun.accept(v, v1);
                             SearchComputed.oneOk();
                         });
@@ -58,8 +58,8 @@ public class SearchComputed {
                     }
                 });
             }
+            latch.await();
         }
-        latch.await();
         System.out.println("耗时:" + (System.currentTimeMillis() - time));
         SearchComputed.pool.shutdown();
         SearchComputed.pool1.shutdown();
