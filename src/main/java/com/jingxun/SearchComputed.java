@@ -19,23 +19,37 @@ import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
-import java.util.concurrent.LinkedBlockingDeque;
-import java.util.concurrent.Semaphore;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiConsumer;
 
 public class SearchComputed {
 
-    static ThreadPoolExecutor pool = new ThreadPoolExecutor(10, 1000, 10, TimeUnit.SECONDS, new LinkedBlockingDeque<>(1000));
+    static final float multiple = Float.parseFloat(System.getProperty("multiple", "1.0"));
 
-    static ThreadPoolExecutor pool1 = new ThreadPoolExecutor(10, 100, 10, TimeUnit.SECONDS, new LinkedBlockingDeque<>(1));
+    static ThreadPoolExecutor pool1 = new ThreadPoolExecutor(10, 200, 10, TimeUnit.SECONDS, new LinkedBlockingDeque<>(1));
 
     public static void fileProcess(int parallel, int parallel1, BiConsumer<Group, MessageType> fun) throws Exception {
         Configuration configuration = new Configuration();
         var time = System.currentTimeMillis();
         var semaphore = new Semaphore(parallel);
-        var semaphore1 = new Semaphore(Math.min(2000, parallel1 * parallel));
+        var _ps = parallel1 * parallel;
+        var size = (int) (_ps * multiple);
+        ExecutorService pool;
+        var semaphore1 = new Semaphore((int) (_ps * multiple) + parallel1);
+        if (size > 3000) {
+            var poolSize = 256;
+            if (size > 40_000) poolSize = 1024;
+            if (size > 10_000) poolSize = 512;
+            System.setProperty("jdk.virtualThreadScheduler.maxPoolSize", String.valueOf(poolSize));
+            System.setProperty("jdk.virtualThreadScheduler.parallelism", String.valueOf(poolSize));
+            var COUNT = new AtomicInteger();
+            pool = new ThreadPoolExecutor(size, size, 10,
+                    TimeUnit.SECONDS, new LinkedBlockingDeque<>(),
+                    r -> Thread.ofVirtual().name("virtual-sys-thread-", COUNT.getAndIncrement()).unstarted(r));
+        } else {
+            pool = new ForkJoinPool(size);
+        }
         var latch = new AddDownLatch();
         try (var fs = FileSystem.get(configuration)) {
             Path path = new Path("/dataplat/OMDPV2/data/data-process-svc/export/yzh/search/allProcData");
@@ -47,7 +61,7 @@ public class SearchComputed {
                 semaphore.acquire();
                 pool1.execute(() -> {
                     try {
-                        SearchComputed.oneFileProcess(fs, _path, parallel, semaphore1, (v, v1) -> {
+                        SearchComputed.oneFileProcess(fs, _path, parallel, semaphore1, pool, (v, v1) -> {
                             fun.accept(v, v1);
                             SearchComputed.oneOk();
                         });
@@ -62,8 +76,8 @@ public class SearchComputed {
             latch.await();
         }
         System.out.println("耗时:" + (System.currentTimeMillis() - time));
-        SearchComputed.pool.shutdown();
-        SearchComputed.pool1.shutdown();
+        pool.shutdown();
+        pool1.shutdown();
     }
 
     public static void createdDir(File file) throws IOException {
@@ -81,7 +95,7 @@ public class SearchComputed {
         if (!file.mkdirs()) throw new IOException("创建失败");
     }
 
-    private static void oneFileProcess(FileSystem fs, Path filePath, int parallel, Semaphore semaphore, BiConsumer<Group, MessageType> fun) throws Exception {
+    private static void oneFileProcess(FileSystem fs, Path filePath, int parallel, Semaphore semaphore, ExecutorService pool, BiConsumer<Group, MessageType> fun) throws Exception {
         GroupReadSupport readSupport = new GroupReadSupport();
         if (!filePath.getName().endsWith(".parquet")) return;
         var latch = new AddDownLatch();
@@ -89,7 +103,7 @@ public class SearchComputed {
              var r = ParquetFileReader.open(HadoopInputFile.fromPath(filePath, fs.getConf()))) {
             MessageType schema = r.getFooter().getFileMetaData().getSchema();
             Group line = null;
-            while ((line = reader.read()) != null) {
+            while ((line = reader.read()) != null && !Thread.currentThread().isInterrupted()) {
                 Group finalLine = line;
                 if (parallel > 1) {
                     latch.add();
@@ -98,8 +112,8 @@ public class SearchComputed {
                         try {
                             fun.accept(finalLine, schema);
                         } finally {
-                            semaphore.release();
                             latch.countDown();
+                            semaphore.release();
                         }
                     });
                 } else {

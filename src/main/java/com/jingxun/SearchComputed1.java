@@ -22,7 +22,7 @@ public class SearchComputed1 {
 
     public static void main(String[] args) throws Exception {
         dir = args[0];
-        SearchComputed.fileProcess(20, 100, SearchComputed1::lineWork);
+        SearchComputed.fileProcess(20, 10, SearchComputed1::lineWork);
         for (var item : blockMap.values()) {
             if (item.index > 0) {
                 item.write.write(item.buffer, 0, item.index << 2);
@@ -30,7 +30,6 @@ public class SearchComputed1 {
             item.write.flush();
             item.write.close();
         }
-        SearchComputed.pool.shutdown();
     }
 
 
