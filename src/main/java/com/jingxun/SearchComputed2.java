@@ -16,7 +16,7 @@ public class SearchComputed2 {
 
     public static void main(String[] args) throws Exception {
         var map = new ConcurrentHashMap<String, AtomicInteger>(5000000, 1);
-        SearchComputed.fileProcess(10, 100,(line, schema) -> {
+        SearchComputed.fileProcess(20, 100,(line, schema) -> {
             var data = (List<String>) SearchComputed.getParquetFieldValue(line, schema.getType("data"), schema.getFieldIndex("data"), 0);
             for (var w : new HashSet<>(data)) {
                 var cnt = map.computeIfAbsent(w, v -> new AtomicInteger(0));

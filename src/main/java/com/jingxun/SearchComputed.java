@@ -35,6 +35,7 @@ public class SearchComputed {
         Configuration configuration = new Configuration();
         var time = System.currentTimeMillis();
         var semaphore = new Semaphore(parallel);
+        var semaphore1 = new Semaphore(Math.min(2000, parallel1 * parallel));
         var latch = new AddDownLatch();
         try (var fs = FileSystem.get(configuration)) {
             Path path = new Path("/dataplat/OMDPV2/data/data-process-svc/export/yzh/search/allProcData");
@@ -46,7 +47,7 @@ public class SearchComputed {
                 semaphore.acquire();
                 pool1.execute(() -> {
                     try {
-                        SearchComputed.oneFileProcess(fs, _path, Math.min(parallel1, 2000 / parallel), (v, v1) -> {
+                        SearchComputed.oneFileProcess(fs, _path, parallel, semaphore1, (v, v1) -> {
                             fun.accept(v, v1);
                             SearchComputed.oneOk();
                         });
@@ -80,11 +81,10 @@ public class SearchComputed {
         if (!file.mkdirs()) throw new IOException("创建失败");
     }
 
-    public static void oneFileProcess(FileSystem fs, Path filePath, int parallel, BiConsumer<Group, MessageType> fun) throws Exception {
+    private static void oneFileProcess(FileSystem fs, Path filePath, int parallel, Semaphore semaphore, BiConsumer<Group, MessageType> fun) throws Exception {
         GroupReadSupport readSupport = new GroupReadSupport();
         if (!filePath.getName().endsWith(".parquet")) return;
         var latch = new AddDownLatch();
-        var semaphore = new Semaphore(parallel);
         try (var reader = ParquetReader.builder(readSupport, filePath).build();
              var r = ParquetFileReader.open(HadoopInputFile.fromPath(filePath, fs.getConf()))) {
             MessageType schema = r.getFooter().getFileMetaData().getSchema();

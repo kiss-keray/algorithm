@@ -12,7 +12,7 @@ public class SearchComputed6 {
 
     public static void main(String[] args) throws Exception {
         var names = new ConcurrentHashSet<String>();
-        SearchComputed.fileProcess(10, 200,(line, schema) -> {
+        SearchComputed.fileProcess(20, 100,(line, schema) -> {
             var data = (List<String>) SearchComputed.getParquetFieldValue(line, schema.getType("data"), schema.getFieldIndex("data"), 0);
             var set = new HashSet<>(data);
             var name = Thread.currentThread().toString();
