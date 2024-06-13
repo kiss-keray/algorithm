@@ -102,7 +102,7 @@
                             <archive>
                                 <manifest>
                                     <mainClass>
-                                        com.jingxun.SearchComputed6
+                                        com.jingxun.SearchComputed4
                                     </mainClass>
                                 </manifest>
                             </archive>
