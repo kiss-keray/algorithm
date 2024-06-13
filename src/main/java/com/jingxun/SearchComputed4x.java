@@ -7,14 +7,13 @@ import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * 生成词到ids的数据
  * 数据 -> [1,2,3]
  */
-public class SearchComputed4 {
+public class SearchComputed4x {
 
     private static String rootPath;
 
@@ -35,18 +34,6 @@ public class SearchComputed4 {
             add(new HashSet<>(data), index.intValue());
         });
         errorOut.close();
-        if (!map.isEmpty()) {
-            map.forEach((k, v) -> {
-                System.out.printf("%s %d %d %n", k, v.total, v.cnt);
-                if (v.write != null) {
-                    try {
-                        v.write.close();
-                    } catch (IOException e) {
-                        throw new RuntimeException(e);
-                    }
-                }
-            });
-        }
     }
 
     private static final Map<String, Integer> wordCntMap = new HashMap<>();
@@ -70,39 +57,31 @@ public class SearchComputed4 {
     static final AtomicInteger ioCnt = new AtomicInteger(0);
 
     private static void add(Set<String> words, int id) {
-        var queue = new LinkedList<>(words);
-        String word = null;
-        while ((word = queue.poll()) != null) {
+        for (var word : words) {
             var total = wordCntMap.get(word);
             if (total == null) continue;
             var data = map.computeIfAbsent(word, v -> new Data(total));
             a:
-            if (data.lock.compareAndSet(false, true)) {
+            synchronized (data.lock) {
+                var _index = data.getIndex();
+                System.arraycopy(ByteUtil.intToBytes(id), 0, data.bytes, _index << 2, 4);
+                data.cnt++;
+                if (_index < Data.len - 1 && data.cnt < data.total) break a;
                 try {
-                    var _index = data.getIndex();
-                    System.arraycopy(ByteUtil.intToBytes(id), 0, data.bytes, _index << 2, 4);
-                    data.cnt++;
-                    if (_index < Data.len - 1 && data.cnt < data.total) break a;
+                    syncWord(word, data);
+                } catch (Exception ignore) {
                     try {
-                        syncWord(word, data);
-                    } catch (Exception e1) {
-                        try {
-                            errorOut.write(String.format("%s %s\n", word, e1).getBytes(StandardCharsets.UTF_8));
-                        } catch (IOException e) {
-                            throw new RuntimeException(e);
-                        }
+                        errorOut.write(String.format("%s\n", word).getBytes(StandardCharsets.UTF_8));
+                    } catch (IOException e) {
+                        throw new RuntimeException(e);
                     }
-                } finally {
-                    data.lock.set(false);
                 }
-                if (data.cnt == data.total) {
-                    data.clean();
-                    map.remove(word);
-                    System.gc();
-                    System.out.printf("%s -> %d 完成 io=%d\n", word, data.total, ioCnt.get());
-                }
-            } else {
-                queue.offer(word);
+            }
+            if (data.cnt == data.total) {
+                data.clean();
+                map.remove(word);
+                System.gc();
+                System.out.printf("%s -> %d 完成 io=%d\n", word, data.total, ioCnt.get());
             }
         }
     }
@@ -113,26 +92,18 @@ public class SearchComputed4 {
         if (write == null) {
             var _ioCnt = ioCnt.getAndIncrement();
             if (_ioCnt > 30000) {
-                System.out.println("xxxxxxxxxxxxxxxxxxxxxxxxxx");
-                a:
-                for (var i = 0; i < 10; i++) {
-                    for (var key : map.keySet()) {
-                        var v = map.get(key);
-                        if (v.lock.compareAndSet(false, true)) {
+                for (var key : map.keySet()) {
+                    var v = map.get(key);
+                    synchronized (v.lock) {
+                        if (v.write != null) {
                             try {
-                                if (v.write != null) {
-                                    try {
-                                        data.write.close();
-                                        data.write = null;
-                                        System.out.println("io不够 关闭其他：" + ioCnt.addAndGet(-1));
-                                        break a;
-                                    } catch (IOException e) {
-                                        System.out.println("关闭失败:" + e);
-                                    }
-                                }
-                            } finally {
-                                v.lock.set(false);
+                                data.write.close();
+                                data.write = null;
+                                System.out.println("io不够 关闭其他：" + ioCnt.addAndGet(-1));
+                            } catch (IOException e) {
+                                continue;
                             }
+                            break;
                         }
                     }
                 }
@@ -142,7 +113,7 @@ public class SearchComputed4 {
         }
         write.write(data.bytes, 0, (data.getIndex() << 2) + 4);
         write.flush();
-        if (data.cnt == data.total || data.total < 100000) {
+        if (data.total == data.cnt || data.total < 100000) {
             data.write.close();
             data.write = null;
             ioCnt.getAndAdd(-1);
@@ -153,7 +124,7 @@ public class SearchComputed4 {
     static class Data {
         static final int len = Integer.parseInt(System.getProperty("len", "10240"));
         static int len1 = len << 2;
-        final AtomicBoolean lock = new AtomicBoolean(false);
+        final Object lock = new Object();
         int total;
         int cnt = 0;
         byte[] bytes = new byte[len1];
