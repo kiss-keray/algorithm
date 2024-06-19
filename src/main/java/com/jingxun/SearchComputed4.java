@@ -29,7 +29,7 @@ public class SearchComputed4 {
             SearchComputed.createdDir(new File(rootPath + "/" + i));
         }
         cntInit();
-        SearchComputed.fileProcess(20, 200, (line, schema) -> {
+        SearchComputed.fileProcess(20, 150, (line, schema) -> {
             var index = (Number) SearchComputed.getParquetFieldValue(line, schema.getType("orderId"), schema.getFieldIndex("orderId"), 0);
             var data = (List<String>) SearchComputed.getParquetFieldValue(line, schema.getType("data"), schema.getFieldIndex("data"), 0);
             add(new HashSet<>(data), index.intValue());
@@ -65,32 +65,28 @@ public class SearchComputed4 {
         }
     }
 
-    private static final ConcurrentHashMap<String, Data> map = new ConcurrentHashMap<>();
+    private static final ConcurrentHashMap<String, Data> map = new ConcurrentHashMap<>(300000);
 
     static final AtomicInteger ioCnt = new AtomicInteger(0);
 
     private static void add(Set<String> words, int id) {
         var queue = new LinkedList<>(words);
         String word = null;
-        while ((word = queue.poll()) != null) {
+        var i = 0;
+        while ((word = queue.poll()) != null && i++ < 1000000) {
             var total = wordCntMap.get(word);
             if (total == null) continue;
             var data = map.computeIfAbsent(word, v -> new Data(total));
-            a:
             if (data.lock.compareAndSet(false, true)) {
                 try {
                     var _index = data.getIndex();
                     System.arraycopy(ByteUtil.intToBytes(id), 0, data.bytes, _index << 2, 4);
                     data.cnt++;
-                    if (_index < Data.len - 1 && data.cnt < data.total) break a;
+                    if (_index < Data.len - 1 && data.cnt < data.total) continue;
                     try {
-                        syncWord(word, data);
+                        syncWord(word, data, _index);
                     } catch (Exception e1) {
-                        try {
-                            errorOut.write(String.format("%s %s\n", word, e1).getBytes(StandardCharsets.UTF_8));
-                        } catch (IOException e) {
-                            throw new RuntimeException(e);
-                        }
+                        System.out.println(word + "  " + e1);
                     }
                 } finally {
                     data.lock.set(false);
@@ -108,39 +104,16 @@ public class SearchComputed4 {
     }
 
 
-    private static void syncWord(String word, Data data) throws Exception {
+    private static void syncWord(String word, Data data, int index) throws Exception {
         var write = data.write;
+        var hash = (word.hashCode() & (dirSize - 1));
         if (write == null) {
-            var _ioCnt = ioCnt.getAndIncrement();
-            if (_ioCnt > 30000) {
-                System.out.println("xxxxxxxxxxxxxxxxxxxxxxxxxx");
-                a:
-                for (var i = 0; i < 10; i++) {
-                    for (var key : map.keySet()) {
-                        var v = map.get(key);
-                        if (v.lock.compareAndSet(false, true)) {
-                            try {
-                                if (v.write != null) {
-                                    try {
-                                        data.write.close();
-                                        data.write = null;
-                                        System.out.println("io不够 关闭其他：" + ioCnt.addAndGet(-1));
-                                        break a;
-                                    } catch (IOException e) {
-                                        System.out.println("关闭失败:" + e);
-                                    }
-                                }
-                            } finally {
-                                v.lock.set(false);
-                            }
-                        }
-                    }
-                }
-            }
-            write = new FileOutputStream(rootPath + "/" + (word.hashCode() & (dirSize - 1)) + "/" + word, true);
+            var _ioCnt = ioCnt.incrementAndGet();
+            write = new FileOutputStream(rootPath + "/" + hash + "/" + word, true);
             data.write = write;
         }
-        write.write(data.bytes, 0, (data.getIndex() << 2) + 4);
+        var len = (index + 1) << 2;
+        write.write(data.bytes, 0, len);
         write.flush();
         if (data.cnt == data.total || data.total < 100000) {
             data.write.close();
@@ -151,12 +124,11 @@ public class SearchComputed4 {
 
 
     static class Data {
-        static final int len = Integer.parseInt(System.getProperty("len", "10240"));
-        static int len1 = len << 2;
+        static final int len = Integer.parseInt(System.getProperty("len", "8192"));
         final AtomicBoolean lock = new AtomicBoolean(false);
         int total;
         int cnt = 0;
-        byte[] bytes = new byte[len1];
+        byte[] bytes = new byte[len << 2];
         FileOutputStream write;
 
         public Data(int total) {
